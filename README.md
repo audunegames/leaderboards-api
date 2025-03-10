@@ -16,11 +16,11 @@ The REST API provides the following features:
 - Submit scores to a board for a contestant with specified values for the score fields in the board.
 - Manage application keys and secrets that can authorize to the REST API.
 
-For all features added in the lifespan of the repository, please refer to the [changelog file](blob/master/CHANGELOG.md).
+For all features added in the lifespan of the repository, please refer to the [changelog file](CHANGELOG.md).
 
 ## Installation
 
-The provided [Dockerfile](blob/master/Dockerfile) builds an image that serves the REST API using NodeJS. An image from this Dockerfile will be built and published to the GitHub Container Registry on every push or pull request using a [GitHub action](blob/master/.github/workflows/docker-publish.yml).
+The provided [Dockerfile](Dockerfile) builds an image that serves the REST API using NodeJS. An image from this Dockerfile will be built and published to the GitHub Container Registry on every push or pull request using a [GitHub action](.github/workflows/docker-publish.yml).
 
 You can pull the current version of the image with the following command:
 
@@ -28,7 +28,7 @@ You can pull the current version of the image with the following command:
 $ docker pull ghcr.io/audunegames/leaderboards-api:master
 ```
 
-Other versions of the package can be found [here](pkgs/container/leaderboards-api).
+Other versions of the package can be found [here](https://github.com/audunegames/leaderboards-api/pkgs/container/leaderboards-api).
 
 ## Configuration
 
@@ -54,4 +54,4 @@ $ npm run dev
 
 ## License
 
-This package is licensed under the GNU LGPL 3.0 license. See the [license file](blob/master/LICENSE.txt) for more information.
+This package is licensed under the GNU LGPL 3.0 license. See the [license file](LICENSE.txt) for more information.

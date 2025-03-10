@@ -1,0 +1,34 @@
+{
+  "name": "@audunegames/leaderboard-api",
+  "version": "0.1.0",
+  "description": "REST API for game leaderboards written in JS",
+  "author": "Audune Games <info@audune.com>",
+  "license": "LGPL-3.0-or-later",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/audunegames/leaderboard-api.git"
+  },
+  "scripts": {
+    "dev": "nodemon src/main.js"
+  },
+  "dependencies": {
+    "cors": "~2.8.5",
+    "dotenv": "~16.4.7",
+    "express": "~4.21.2",
+    "http-errors": "~2.0.0",
+    "jsonwebtoken": "~9.0.2",
+    "mysql2": "~3.13.0",
+    "passport": "~0.7.0",
+    "passport-http": "~0.3.0",
+    "passport-jwt": "~4.0.1",
+    "simpleflakes": "~2.2.2",
+    "sequelize": "~6.37.6",
+    "sqlite3": "~5.1.7",
+    "validator": "~13.7.0",
+    "winston": "~3.17.0"
+  },
+  "devDependencies": {
+    "nodemon": "~3.1.9"
+  }
+}

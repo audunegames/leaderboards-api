@@ -10,11 +10,16 @@ const winston = require('winston');
 const auth = require('./auth');
 const models = require('./models');
 const routes = require('./routes');
-const utils = require('./utils');
+
+const env = require('./utils/env');
+const middleware = require('./utils/middleware');
 
 
 // Array of valid logging levels
 const loggingLevels = ['debug', 'verbose', 'info', 'warn', 'error'];
+
+// Constant that defines the audience for JWTs
+const audience = "leaderboard-api";
 
 
 // Function to create the logger
@@ -57,7 +62,7 @@ async function createDatabase(logger, databaseUrl) {
 }
 
 // Function to create the app
-async function createApp(logger, db, adminCredentials, authSecret) {
+async function createApp(logger, db, adminCredentials, authSecret, authAudience) {
   // Create the app
   logger.info(`Setting up the app...`);
   const app = express();
@@ -78,20 +83,20 @@ async function createApp(logger, db, adminCredentials, authSecret) {
 
     // Configure the authentication strategies
     passport.use('basic', auth.basicStrategy(logger));
-    passport.use('token', auth.tokenStrategy(logger, authSecret));
-    passport.use('token-admin', auth.tokenStrategy(logger, authSecret, true));
+    passport.use('token', auth.tokenStrategy(logger, authSecret, authAudience));
+    passport.use('token-admin', auth.tokenStrategy(logger, authSecret, authAudience, true));
 
     // Add the middlewares to the app
-    app.use(utils.logRequest(logger));
+    app.use(middleware.log(logger));
     app.use(cors());
     app.use(bodyParser.json());
     app.use(passport.initialize());
 
     // Add the routes to the app
-    routes(app, (key) => auth.generateToken(key, authSecret));
+    routes(app, (key) => auth.generateToken(key, authSecret, authAudience));
 
     // Add the error middleware to the app
-    app.use(utils.respondWithError(logger));
+    app.use(middleware.respondWithError(logger));
 
     // Return the app
     return app;
@@ -128,18 +133,17 @@ async function main() {
   // Load the settings from the environment
   dotenv.config();
 
-  const loggingLevel = utils.validateEnvVariable('LEADERBOARD_LOGGING_LEVEL', {default: 'info' , validators: [s => loggingLevels.includes(s)]});
-  const databaseUrl = utils.validateEnvVariable('LEADERBOARD_DATABASE_URL');
-  const adminApiKey = utils.validateEnvVariable('LEADERBOARD_ADMIN_API_KEY');
-  const adminApiSecret = utils.validateEnvVariable('LEADERBOARD_ADMIN_API_SECRET');
-  const authSecret = utils.validateEnvVariable('LEADERBOARD_AUTH_SECRET', {validators: [s => validator.isLength(s, {min: 32})]});
-  const serverHost = utils.validateEnvVariable('LEADERBOARD_SERVER_HOST', {default: ''});
-  const serverPort = utils.validateEnvVariable('LEADERBOARD_SERVER_PORT', {default: 80, type: parseInt, validators: [validator.isPort]});
-  const serverIPv6Only = utils.validateEnvVariable('LEADERBOARD_SERVER_IPV6_ONLY', {default: false, type: utils.parseBool, validators: [validator.isBoolean]});
+  const loggingLevel = env.validate('LEADERBOARD_LOGGING_LEVEL', {default: 'info' , validators: [s => loggingLevels.includes(s)]});
+  const databaseUrl = env.validate('LEADERBOARD_DATABASE_URL');
+  const adminApiKey = env.validate('LEADERBOARD_ADMIN_API_KEY');
+  const adminApiSecret = env.validate('LEADERBOARD_ADMIN_API_SECRET');
+  const authSecret = env.validate('LEADERBOARD_AUTH_SECRET', {validators: [s => validator.isLength(s, {min: 32})]});
+  const authAudience = env.validate('LEADERBOARD_AUTH_AUDIENCE', {default: 'leaderboards-api'});
+  const serverHost = env.validate('LEADERBOARD_SERVER_HOST', {default: ''});
+  const serverPort = env.validate('LEADERBOARD_SERVER_PORT', {default: 80, type: parseInt, validators: [validator.isPort]});
+  const serverIPv6Only = env.validate('LEADERBOARD_SERVER_IPV6_ONLY', {default: false, type: env.parseBool, validators: [validator.isBoolean]});
 
   const adminCredentials = {key: adminApiKey, secret: adminApiSecret};
-
-  console.log(databaseUrl);
 
   // Create the logger
   const logger = createLogger(loggingLevel);
@@ -150,7 +154,7 @@ async function main() {
     return;
 
   // Create the app
-  const app = await createApp(logger, db, adminCredentials, authSecret);
+  const app = await createApp(logger, db, adminCredentials, authSecret, authAudience);
   if (app === undefined)
       return;
 

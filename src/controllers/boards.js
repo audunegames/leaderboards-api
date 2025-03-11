@@ -2,7 +2,10 @@ const express = require('express');
 const httpError = require('http-errors');
 
 const models = require('../models');
-const utils = require('../utils');
+
+const ids = require('../utils/ids');
+const middleware = require('../utils/middleware');
+
 
 
 // Configure the router
@@ -28,13 +31,13 @@ module.exports = function(app) {
 
   // Add the create board route
   router.post('/',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Create the board
       const board = await models.Board.create({
-        id: utils.generateId(),
+        id: ids.snowflake(),
         name: req.body.name,
-        fields: models.Field.inputObjectToArray(req.body.fields, utils.generateId),
+        fields: models.Field.inputObjectToArray(req.body.fields, ids.snowflake),
       }, {include: [models.Board.Fields]});
 
       // Respond with the board
@@ -44,8 +47,8 @@ module.exports = function(app) {
 
   // Add the list boards route
   router.get('/',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Get the boards
       const boards = await models.Board.findAll();
 
@@ -55,16 +58,16 @@ module.exports = function(app) {
 
   // Add the get board route
   router.get('/:boardId',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Respond with the board
       return res.json(await req.board.toOutputObject());
     }));
 
   // Add the modify board route
   router.patch('/:boardId',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Modify the board
       if (req.body.name !== undefined)
         req.board.name = req.body.name;
@@ -77,8 +80,8 @@ module.exports = function(app) {
 
   // Add the remove board route
   router.delete('/:boardId',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Remove the board
       req.board.destroy();
 
@@ -89,8 +92,8 @@ module.exports = function(app) {
 
   // Add the submit score to board route
   router.post('/:boardId/scores/:contestantId',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Get the contestant
       const contestant = await models.Contestant.findByPk(req.params.contestantId);
       if (contestant == null)
@@ -135,7 +138,7 @@ module.exports = function(app) {
           } else {
             // Create a new score
             entry.score = await models.Score.create({
-              id: utils.generateId(),
+              id: ids.snowflake(),
               boardId: req.board.id,
               contestantId: contestant.id,
               fieldId: entry.field.id,

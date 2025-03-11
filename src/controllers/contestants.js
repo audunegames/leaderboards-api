@@ -2,7 +2,9 @@ const express = require('express');
 const httpError = require('http-errors');
 
 const models = require('../models');
-const utils = require('../utils');
+
+const ids = require('../utils/ids');
+const middleware = require('../utils/middleware');
 
 
 // Configure the router
@@ -28,11 +30,11 @@ module.exports = function(app) {
 
   // Add the create contestant route
   router.post('/',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Create the contestant
       const contestant = await models.Contestant.create({
-        id: utils.generateId(),
+        id: ids.snowflake(),
         name: req.body.name,
       });
 
@@ -43,8 +45,8 @@ module.exports = function(app) {
 
   // Add the list contestants route
   router.get('/',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Get the contestants
       const contestants = await models.Contestant.findAll();
 
@@ -54,16 +56,16 @@ module.exports = function(app) {
 
   // Add the get contestant route
   router.get('/:contestantId',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Respond with the contestant
       return res.json(await req.contestant.toOutputObject());
     }));
 
   // Add the modify contestant route
   router.patch('/:contestantId',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Modify the contestant
       if (req.body.name !== undefined)
         req.contestant.name = req.body.name;
@@ -76,8 +78,8 @@ module.exports = function(app) {
 
   // Add the remove contestant route
   router.delete('/:contestantId',
-    utils.authenticate('token'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token'),
+    middleware.catch(async function(req, res, next) {
       // Remove the contestant
       req.contestant.destroy();
 

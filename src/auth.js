@@ -5,10 +5,6 @@ const passportJwt = require('passport-jwt');
 const models = require('./models');
 
 
-// Constant that defines the audience for JWTs
-const audience = "leaderboard-api";
-
-
 // Define the basic authentication strategy
 module.exports.basicStrategy = function(logger) {
   return new passportHttp.BasicStrategy(async function(key, secret, done) {
@@ -38,11 +34,11 @@ module.exports.basicStrategy = function(logger) {
 };
 
 // Define the JWT authentication strategy
-module.exports.tokenStrategy = function(logger, authSecret, requireAdmin = false) {
+module.exports.tokenStrategy = function(logger, authSecret, authAudience, requireAdmin = false) {
   return new passportJwt.Strategy({
     secretOrKey: authSecret,
     jwtFromRequest: passportJwt.ExtractJwt.fromAuthHeaderAsBearerToken(),
-    audience: audience,
+    audience: authAudience,
     algorithms: ['HS256']
   }, async function(jwt_payload, done) {
     try {      
@@ -71,10 +67,10 @@ module.exports.tokenStrategy = function(logger, authSecret, requireAdmin = false
 };
 
 // Generate a JWT for the specified app key and secret
-module.exports.generateToken = function(key, authSecret) {
+module.exports.generateToken = function(key, authSecret, authAudience) {
   return jwt.sign({}, authSecret, {
     expiresIn: '60m',
-    audience: audience,
+    audience: authAudience,
     subject: key,
   });
 };

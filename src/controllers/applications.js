@@ -2,7 +2,9 @@ const express = require('express');
 const httpError = require('http-errors');
 
 const models = require('../models');
-const utils = require('../utils');
+
+const ids = require('../utils/middleware');
+const middleware = require('../utils/middleware');
 
 
 // Configure the router
@@ -28,12 +30,12 @@ module.exports = function(app) {
 
   // Add the create application route
   router.post('/',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Create the application
       const application = await models.Application.create({
-        key: utils.generateApplicationKey(),
-        secret: utils.generateApplicationKey(),
+        key: ids.key(),
+        secret: ids.key(),
         name: req.body.name,
         admin: req.body.admin || false,
       });
@@ -45,8 +47,8 @@ module.exports = function(app) {
 
   // Add the list application route
   router.get('/',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Get the applications
       const applications = await models.Application.findAll();
 
@@ -56,16 +58,16 @@ module.exports = function(app) {
 
   // Add the get application route
   router.get('/:applicationKey',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Respond with the application
       return res.json(await req.application.toOutputObject());
     }));
 
   // Add the modify application route
   router.patch('/:applicationKey',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Modify the application
       if (req.body.name !== undefined)
         req.application.name = req.body.name;
@@ -80,8 +82,8 @@ module.exports = function(app) {
 
   // Add the remove application route
   router.delete('/:applicationKey',
-    utils.authenticate('token-admin'),
-    utils.catchErrors(async function(req, res, next) {
+    middleware.authenticate('token-admin'),
+    middleware.catch(async function(req, res, next) {
       // Remove the application
       req.application.destroy();
 

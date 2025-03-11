@@ -38,6 +38,7 @@ The REST API supports configuration via environment variables. The following env
 - `LEADERBOARD_ADMIN_API_KEY` - The key for the administration application that will be set up automatically on the first run. Ideally should be 32 characters long and contain only `[a-z0-9]`, as that is how the REST API internally generates new application keys (**required**).
 - `LEADERBOARD_ADMIN_API_SECRET` - The secret for the administration application. Ideally should be 32 characters long and contain only `[a-z0-9]`, as that is how the REST API internally generates new application secrets (**required**).
 - `LEADERBOARD_AUTH_SECRET` - The secret used to sign JWT tokens for authentication. Should be minimal 32 characters long (**required**).
+- `LEADERBOARD_AUTH_AUDIENCE` - The audience used to verify JWT tokens for authentication. Defaults to `leaderboards-api`.
 - `LEADERBOARD_SERVER_HOST` - The listen address for the HTTP server that serves the REST API. Defaults to `0.0.0.0` for IPv4 and `::` for IPv6.
 - `LEADERBOARD_SERVER_PORT` - The listen port for the HTTP server. Defaults to `80`.
 - `LEADERBOARD_SERVER_IPV6_ONLY` - Set to `true` if the HTTP server should only listen on IPv6. Defaults to `false`.

@@ -53,7 +53,7 @@ module.exports = function(app) {
       const boards = await models.Board.findAll();
 
       // Respond with the boards
-      return res.json(boards.map(async board => await board.toOutputObject()));
+      return res.json(await Promise.all(boards.map(async board => await board.toOutputObject())));
     }));
 
   // Add the get board route

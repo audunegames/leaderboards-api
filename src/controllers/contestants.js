@@ -51,7 +51,7 @@ module.exports = function(app) {
       const contestants = await models.Contestant.findAll();
 
       // Respond with the contestants
-      return res.json(contestants.map(async contestant => await contestant.toOutputObject()));
+      return res.json(await Promise.all(contestants.map(async contestant => await contestant.toOutputObject())));
     }));
 
   // Add the get contestant route

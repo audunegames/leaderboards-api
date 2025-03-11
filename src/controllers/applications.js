@@ -3,7 +3,7 @@ const httpError = require('http-errors');
 
 const models = require('../models');
 
-const ids = require('../utils/middleware');
+const ids = require('../utils/ids');
 const middleware = require('../utils/middleware');
 
 
@@ -53,7 +53,7 @@ module.exports = function(app) {
       const applications = await models.Application.findAll();
 
       // Respond with the applications
-      return res.json(applications.map(async application => await application.toOutputObject()));
+      return res.json(await Promise.all(applications.map(async application => await application.toOutputObject())));
     }));
 
   // Add the get application route

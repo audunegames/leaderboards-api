@@ -16,7 +16,7 @@ module.exports = function(app) {
   router.param('contestantId', async function(req, res, next, contestantId) {
     try {
       // Get the contestant
-      req.contestant = await models.Contestant.findByPk(contestantId, {include: models.Contestant.Scores});
+      req.contestant = await models.Contestant.findByPk(contestantId, {include: [{association: models.Contestant.Entries, include: [models.ScoreEntry.Values]}]});
       if (req.contestant === null)
         return next(httpError.NotFound(`Could not find contestant with identifier ${JSON.stringify(contestantId)}`));
 
@@ -40,7 +40,7 @@ module.exports = function(app) {
 
       // Respond with the contestant
       req.app.locals.logger.verbose(`Created contestant with identifier ${JSON.stringify(contestant.id)}`);
-      return res.status(201).json(await contestant.toOutputObject());
+      return res.status(201).json(await contestant.toAPI());
     }));
 
   // Add the list contestants route
@@ -51,7 +51,7 @@ module.exports = function(app) {
       const contestants = await models.Contestant.findAll();
 
       // Respond with the contestants
-      return res.json(await Promise.all(contestants.map(async contestant => await contestant.toOutputObject())));
+      return res.json(await models.Contestant.arrayToAPI(contestants));
     }));
 
   // Add the get contestant route
@@ -59,7 +59,7 @@ module.exports = function(app) {
     middleware.authenticate('token'),
     middleware.catch(async function(req, res, next) {
       // Respond with the contestant
-      return res.json(await req.contestant.toOutputObject());
+      return res.json(await req.contestant.toAPI(['entries']));
     }));
 
   // Add the modify contestant route
@@ -73,7 +73,7 @@ module.exports = function(app) {
 
       // Respond with the contestant
       req.app.locals.logger.verbose(`Modified contestant with identifier ${JSON.stringify(contestant.id)}`);
-      return res.json(await req.contestant.toOutputObject());
+      return res.json(await req.contestant.toAPI(['entries']));
     }));
 
   // Add the remove contestant route

@@ -4,38 +4,53 @@ const { Model, DataTypes } = require('sequelize');
 // Class that defines an application
 class Application extends Model
 {
-  // Convert the application to an ouput object
-  async toOutputObject(includeSecret = false) {
-    const output = {key: this.key, name: this.name, admin: this.admin};
-    if (includeSecret)
-      output.secret = this.secret;
-    return output;
+  // Convert the application to its API representation
+  async toAPI(include = []) {
+    const object = {key: this.key, name: this.name, admin: this.admin, createdAt: this.createdAt, updatedAt: this.updatedAt};
+    if (include.includes('secret') && this.secret !== undefined)
+      object.secret = this.secret;
+    return object;
+  }
+
+  // Convert an array of applications to its API representation
+  static async arrayToAPI(applications, include = []) {
+    return await Promise.all(applications.map(async application => await application.toAPI(include)));
   }
 }
 
 // Class that defines a contestant
 class Contestant extends Model
 {
-  // Convert the contestant to an ouput object
-  async toOutputObject() {
-    const output = this.toJSON();
-    if (output.scores !== undefined)
-      output.scores = await Score.arrayToOutputObjectGroupByBoard(output.scores);
-    return output;
+  // Convert the contestant to its API representation
+  async toAPI(include = []) {
+    const object = {id: this.id, name: this.name, createdAt: this.createdAt, updatedAt: this.updatedAt};
+    if (include.includes('entries'))
+      object.entries = await ScoreEntry.arrayToAPI(this.entries, ['board']);
+    return object;
+  }
+
+  // Convert an array of contestants to its API representation
+  static async arrayToAPI(contestants, include = []) {
+    return await Promise.all(contestants.map(async contestant => await contestant.toAPI(include)));
   }
 }
 
 // Class that defines a board
 class Board extends Model
 {
-  // Convert the contestant to an ouput object
-  async toOutputObject() {
-    const output = this.toJSON();
-    if (output.fields !== undefined)
-      output.fields = await Field.arrayToOutputObject(output.fields);
-    if (output.scores !== undefined)
-      output.scores = await Score.arrayToOutputObjectGroupByContestant(output.scores);
-    return output;
+  // Convert the board to its API representation
+  async toAPI(include = []) {
+    const object = {id: this.id, name: this.name, createdAt: this.createdAt, updatedAt: this.updatedAt};
+    if (include.includes('fields') && this.fields !== undefined)
+      object.fields = await Field.arrayToAPI(this.fields);
+    if (include.includes('entries') && this.entries !== undefined)
+      object.entries = await ScoreEntry.arrayToAPI(this.entries, ['contestant']);
+    return object;
+  }
+
+  // Convert an array of boards to its API representation
+  static async arrayToAPI(boards, include = []) {
+    return await Promise.all(boards.map(async board => await board.toAPI(include)));
   }
 }
 
@@ -43,7 +58,8 @@ class Board extends Model
 class Field extends Model
 {
   // Compare two values based on the field
-  compare(a, b) {
+  compareValues(a, b) {
+    console.log(`Comparing values on field ${this.name}: ${a} and ${b}`);
     if (a === undefined || b === undefined)
       throw new Error('One or both operands are undefined');
 
@@ -53,62 +69,49 @@ class Field extends Model
       return b - a;
   }
 
-  // Convert an array of fields to an ouput object
-  static async arrayToOutputObject(fields) {
-    const output = {};
-    for (const field of fields)
-      output[field.name] = {sortOrder: field.sortOrder, sortDescending: field.sortDescending};
-    return output;
+  // Convert the field to its API representation
+  async toAPI() {
+    return {sortOrder: this.sortOrder, sortDescending: this.sortDescending};
   }
 
-  // Convert an input object to an array of fields
-  static inputObjectToArray(input, generateId = undefined) {
-    const fields = [];
-    for (const fieldName in input) {
-      const field = {...input[fieldName], name: fieldName};
-      if (generateId !== undefined)
-        field.id = generateId();
-      fields.push(field);
-    }
-    return fields;
+  // Convert an array of fields to its API representation
+  static async arrayToAPI(fields) {
+    return Object.fromEntries(await Promise.all(fields.map(async field => [field.name, await field.toAPI()])));
   }
 }
 
-// Class that defines a score
-class Score extends Model
+// Class that defines a score entry
+class ScoreEntry extends Model
 {
-  // Convert an array of scores to an output object
-  static async arrayToOutputObject(scores, options) {
-    const outputArray = [];
-    const groupedScores = Object.groupBy(scores, options.groupFn);
-    for (const [id, scores] of Object.entries(groupedScores)) {
-      const output = {scores: {}};
-      output[options.name] = await options.resolveFn(id);
-      for (const score of scores) {
-        const field = await Field.findByPk(score.fieldId);
-        output.scores[field.name] = score.value;
-      }
-      outputArray.push(output);
-    }
-    return outputArray;
+  // Convert a score entry to its API representation
+  async toAPI(include = []) {
+    const object = {gameVersion: this.gameVersion, gamePlatform: this.gamePlatform, createdAt: this.createdAt, updatedAt: this.updatedAt};
+    if (this.values !== undefined)
+      object.values = await ScoreValue.arrayToAPI(this.values);
+    if (include.includes('board') && this.boardId !== undefined)
+      object.board = await Board.findByPk(this.boardId);
+    if (include.includes('contestant') && this.contestantId !== undefined)
+      object.contestant = await Contestant.findByPk(this.contestantId);
+    return object;
   }
 
-  // Convert an array of scores to an output object, grouped by the board of the score
-  static async arrayToOutputObjectGroupByBoard(scores) {
-    return await Score.arrayToOutputObject(scores, {
-      name: 'board',
-      groupFn: score => score.boardId, 
-      resolveFn: async id => await Board.findByPk(id),
-    });
+  // Convert an array of score entries to its API representation
+  static async arrayToAPI(entries, include = []) {
+    return await Promise.all(entries.map(async entry => await entry.toAPI(include)));
   }
+}
 
-  // Convert an array of scores to an output object, grouped by the contestant of the score
-  static async arrayToOutputObjectGroupByContestant(scores) {
-    return await Score.arrayToOutputObject(scores, {
-      name: 'contestant',
-      groupFn: score => score.contestantId, 
-      resolveFn: async id => await Contestant.findByPk(id),
-    });
+// Class that defines a score value
+class ScoreValue extends Model
+{
+  // Convert a score value to its API representation
+  async toAPI() {
+    return this.value;
+  }
+  
+  // Convert an array of score values to its API representation
+  static async arrayToAPI(values) {
+    return Object.fromEntries(await Promise.all(values.map(async value => [(await Field.findByPk(value.fieldId)).name, await value.toAPI()])));
   }
 }
 
@@ -143,24 +146,34 @@ module.exports = function(db) {
     sortDescending: {type: DataTypes.BOOLEAN, allowNull: false},
   }, {sequelize: db, tableName: 'fields', timestamps: false, indexes: [{name: 'fieldId', unique: true, fields: ['boardId', 'name']}]});
 
-  // Define the score nmodel
-  Score.init({
+  // Define the score entry model
+  ScoreEntry.init({
+    id: {type: DataTypes.STRING, primaryKey: true, allowNull: false},
+    gameVersion: {type: DataTypes.STRING, allowNull: true},
+    gamePlatform: {type: DataTypes.STRING, allowNull: true},
+  }, {sequelize: db, tableName: 'scoreEntries', indexes: [{name: 'entryId', unique: true, fields: ['boardId', 'contestantId']}]});
+
+  // Define the score value model
+  ScoreValue.init({
     id: {type: DataTypes.STRING, primaryKey: true, allowNull: false},
     value: {type: DataTypes.INTEGER, allowNull: false},
-  }, {sequelize: db, tableName: 'scores', timestamps: false, indexes: [{name: 'scoreId', unique: true, fields: ['boardId', 'contestantId', 'fieldId']}]});
+  }, {sequelize: db, tableName: 'scoreValues', timestamps: false, indexes: [{name: 'scoreId', unique: true, fields: ['entryId', 'fieldId']}]});
 
   // Define associations
   Field.Board = Field.belongsTo(Board, {as: 'board', foreignKey: 'boardId'});
   Board.Fields = Board.hasMany(Field, {as: 'fields', foreignKey: 'boardId'});
 
-  Score.Board = Score.belongsTo(Board, {as: 'board', foreignKey: 'boardId'});
-  Board.Scores = Board.hasMany(Score, {as: 'scores', foreignKey: 'boardId'});
+  ScoreEntry.Board = ScoreEntry.belongsTo(Board, {as: 'board', foreignKey: 'boardId'});
+  Board.Entries = Board.hasMany(ScoreEntry, {as: 'entries', foreignKey: 'boardId'});
 
-  Score.Contestant = Score.belongsTo(Contestant, {as: 'contestant', foreignKey: 'contestantId'});
-  Contestant.Scores = Contestant.hasMany(Score, {as: 'scores', foreignKey: 'contestantId'});
+  ScoreEntry.Contestant = ScoreEntry.belongsTo(Contestant, {as: 'contestant', foreignKey: 'contestantId'});
+  Contestant.Entries = Contestant.hasMany(ScoreEntry, {as: 'entries', foreignKey: 'contestantId'});
 
-  Score.Field = Score.belongsTo(Field, {as: 'field', foreignKey: 'fieldId'});
-  Field.Scores = Field.hasMany(Score, {as: 'scores', foreignKey: 'fieldId'});
+  ScoreValue.Entry = ScoreValue.belongsTo(ScoreEntry, {as: 'entry', foreignKey: 'entryId'});
+  ScoreEntry.Values = ScoreEntry.hasMany(ScoreValue, {as: 'values', foreignKey: 'entryId'})
+
+  ScoreValue.Field = ScoreValue.belongsTo(Field, {as: 'field', foreignKey: 'fieldId'});
+  Field.Values = Field.hasMany(ScoreValue, {as: 'values', foreignKey: 'fieldId'});
 };
 
 // Export the models
@@ -168,4 +181,5 @@ module.exports.Application = Application;
 module.exports.Contestant = Contestant;
 module.exports.Board = Board;
 module.exports.Field = Field;
-module.exports.Score = Score;
+module.exports.ScoreEntry = ScoreEntry;
+module.exports.ScoreValue = ScoreValue;

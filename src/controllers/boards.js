@@ -17,7 +17,7 @@ module.exports = function(app) {
   router.param('boardId', async function(req, res, next, boardId) {
     try {
       // Get the board
-      req.board = await models.Board.findByPk(boardId, {include: [models.Board.Fields, models.Board.Scores]});
+      req.board = await models.Board.findByPk(boardId, {include: [models.Board.Fields, {association: models.Board.Entries, include: [models.ScoreEntry.Values]}]});
       if (req.board === null)
         return next(httpError.NotFound(`Could not find board with identifier ${JSON.stringify(boardId)}`));
 
@@ -37,12 +37,16 @@ module.exports = function(app) {
       const board = await models.Board.create({
         id: ids.snowflake(),
         name: req.body.name,
-        fields: models.Field.inputObjectToArray(req.body.fields, ids.snowflake),
+        fields: Object.entries(req.body.fields).map(([name, object]) => ({
+          ...object,
+          name: name,
+          id: ids.snowflake
+        })),
       }, {include: [models.Board.Fields]});
 
       // Respond with the board
       req.app.locals.logger.verbose(`Created board with identifier ${JSON.stringify(board.id)}`);
-      return res.status(201).json(await board.toOutputObject());
+      return res.status(201).json(await board.toAPI(['fields']));
     }));
 
   // Add the list boards route
@@ -53,7 +57,7 @@ module.exports = function(app) {
       const boards = await models.Board.findAll();
 
       // Respond with the boards
-      return res.json(await Promise.all(boards.map(async board => await board.toOutputObject())));
+      return res.json(await models.Board.arrayToAPI(boards, ['fields', 'entries']));
     }));
 
   // Add the get board route
@@ -61,7 +65,7 @@ module.exports = function(app) {
     middleware.authenticate('token'),
     middleware.catch(async function(req, res, next) {
       // Respond with the board
-      return res.json(await req.board.toOutputObject());
+      return res.json(await req.board.toAPI(['fields', 'entries']));
     }));
 
   // Add the modify board route
@@ -75,7 +79,7 @@ module.exports = function(app) {
 
       // Respond with the boards
       req.app.locals.logger.verbose(`Modified board with identifier ${JSON.stringify(req.board.id)}`);
-      return res.json(await req.board.toOutputObject());
+      return res.json(await req.board.toAPI(['fields', 'entries']));
     }));
 
   // Add the remove board route
@@ -91,67 +95,78 @@ module.exports = function(app) {
     }));
 
   // Add the submit score to board route
-  router.post('/:boardId/scores/:contestantId',
+  router.post('/:boardId/submit/:contestantId',
     middleware.authenticate('token'),
     middleware.catch(async function(req, res, next) {
       // Get the contestant
       const contestant = await models.Contestant.findByPk(req.params.contestantId);
       if (contestant == null)
         return next(httpError.NotFound(`Could not find contestant with identifier ${JSON.stringify(req.params.contestantId)}`));
-      
-      req.app.locals.logger.debug(`Attempting to submit score for board with identifier ${JSON.stringify(req.board.id)} and contestant with identifier ${JSON.stringify(contestant.id)}`);
 
-      // Get the fields
-      const fields = await req.board.getFields();
-
-      // Iterate over the fields in the board to fetch existing scores
-      const entries = [];
-      for (const field of fields) {
+      // Get the fields and their values from the request body
+      const fields = [];
+      for (const field of await req.board.getFields()) {
         // Check if the field exists in the body
-        const value = req.body[field.name];
+        const value = req.body.values[field.name];
         if (value === undefined)
           throw httpError.NotFound(`Could not find field with name ${JSON.stringify(field.name)} in the request body`);
 
-        // Check if a score for the board, contestant, and field already exists
-        const score = await models.Score.findOne({where: {boardId: req.board.id, contestantId: contestant.id, fieldId: field.id}});
-        if (score !== null) {
-          const isBest = field.compare(score.value, value) < 0;
-          entries.push({field: field, score: score, newValue: value, newValueIsBest: isBest});
-          req.app.locals.logger.debug(`Found existing score for field with name ${field.name}: {newValue: ${value}, value: ${score.value}, newValueIsBest: ${isBest}}`);
-        } else {
-          entries.push({field: field, score: null, newValue: value, newValueIsBest: true});
-          req.app.locals.logger.debug(`New score for field with name ${field.name}: {newValue: ${value}}`);
-        }
+        // Set the value
+        fields.push({field, value});
       }
 
-      // Update the score if the new score is the best score
-      if (entries.some(({score}) => score === null) || entries.some(({newValueIsBest}) => newValueIsBest)) {
-        req.app.locals.logger.debug(`The new score is best score, so update the score`);
-        
-        // Iterate over the existing scores
-        for (const entry of entries) {
-          // Check if the existing score is defined
-          if (entry.score !== null) {
-            // Modify the existing score
-            entry.score.value = entry.newValue;
-            await entry.score.save();
-          } else {
-            // Create a new score
-            entry.score = await models.Score.create({
-              id: ids.snowflake(),
-              boardId: req.board.id,
-              contestantId: contestant.id,
-              fieldId: entry.field.id,
-              value: entry.newValue,
-            });
+      // Sort the fields
+      fields.sort((a, b) => a.field.sortOrder - b.field.sortOrder);
+
+      // Create a new score entry
+      let entry = models.ScoreEntry.build({
+        id: ids.snowflake(),
+        boardId: req.board.id,
+        contestantId: contestant.id,
+        gameVersion: req.body.gameVersion || null,
+        gamePlatform: req.body.gamePlatform || null,
+        values: fields.map(({field, value}) => ({
+          id: ids.snowflake(),
+          fieldId: field.id,
+          value: value,
+        })),
+      }, {include: [models.ScoreEntry.Values]})
+
+      // Check if a score entry for the board and contestant already exists
+      const existingEntry = await models.ScoreEntry.findOne({where: {boardId: req.board.id, contestantId: contestant.id}, include: [models.ScoreEntry.Values]});
+      if (existingEntry != null) {
+        // Calculate which entry has the best values
+        let bestEntry = 0;
+        for (const {field, value} of fields) {
+          const existingValue = existingEntry.values.find(value => value.fieldId == field.id);
+          bestEntry = field.compareValues(existingValue.value, value);
+          if (bestEntry !== 0)
+            break;
+        }
+
+        // Check if the new entry has the best values
+        if (bestEntry > 0) {
+          // Update the existing entry
+          await existingEntry.update({gameVersion: entry.gameVersion, gamePlatform: entry.gamePlatform});
+          await existingEntry.save();
+
+          for (const {field, value} of fields) {
+            const existingValue = existingEntry.values.find(value => value.fieldId == field.id);
+            await existingValue.update({value: value});
+            await existingValue.save();
           }
         }
+
+        // Overwrite the entry
+        entry = existingEntry;
       } else {
-        req.app.locals.logger.debug(`The existing score is best score, so leave the score unchanged`);
+        // Save the new score entry
+        await entry.save();
       }
 
-      // Respond with the board
-      return res.json(await models.Score.arrayToOutputObjectGroupByContestant(entries.map(entry => entry.score)));
+      // Respond with the entry
+      req.app.locals.logger.verbose(`Submitted score for board with identifier ${JSON.stringify(req.board.id)} and contestant with identifier ${JSON.stringify(contestant.id)}`);
+      return res.json(await entry.toAPI());
     }));
 
   // Return the router

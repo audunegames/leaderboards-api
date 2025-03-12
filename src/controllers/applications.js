@@ -42,7 +42,7 @@ module.exports = function(app) {
 
       // Respond with the application
       req.app.locals.logger.verbose(`Created application with key ${JSON.stringify(application.key)}`);
-      return res.status(201).json(await application.toOutputObject(true));
+      return res.status(201).json(await application.toAPI(['secret']));
     }));
 
   // Add the list application route
@@ -53,7 +53,7 @@ module.exports = function(app) {
       const applications = await models.Application.findAll();
 
       // Respond with the applications
-      return res.json(await Promise.all(applications.map(async application => await application.toOutputObject())));
+      return res.json(await models.Application.arrayToAPI(applications));
     }));
 
   // Add the get application route
@@ -61,7 +61,7 @@ module.exports = function(app) {
     middleware.authenticate('token-admin'),
     middleware.catch(async function(req, res, next) {
       // Respond with the application
-      return res.json(await req.application.toOutputObject());
+      return res.json(await req.application.toAPI());
     }));
 
   // Add the modify application route
@@ -77,7 +77,7 @@ module.exports = function(app) {
 
       // Respond with the application
       req.app.locals.logger.verbose(`Modified application with key ${JSON.stringify(req.application.key)}`);
-      return res.json(await req.application.toOutputObject());
+      return res.json(await req.application.toAPI());
     }));
 
   // Add the remove application route

@@ -40,7 +40,7 @@ module.exports = function(app) {
         fields: Object.entries(req.body.fields).map(([name, object]) => ({
           ...object,
           name: name,
-          id: ids.snowflake
+          id: ids.snowflake()
         })),
       }, {include: [models.Board.Fields]});
 

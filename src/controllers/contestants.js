@@ -39,7 +39,7 @@ module.exports = function(app) {
       });
 
       // Respond with the contestant
-      req.app.locals.logger.verbose(`Created contestant with identifier ${JSON.stringify(contestant.id)}`);
+      req.app.locals.logger.verbose(`Created contestant with identifier ${JSON.stringify(req.contestant.id)}`);
       return res.status(201).json(await contestant.toAPI());
     }));
 
@@ -72,7 +72,7 @@ module.exports = function(app) {
       await req.contestant.save();
 
       // Respond with the contestant
-      req.app.locals.logger.verbose(`Modified contestant with identifier ${JSON.stringify(contestant.id)}`);
+      req.app.locals.logger.verbose(`Modified contestant with identifier ${JSON.stringify(req.contestant.id)}`);
       return res.json(await req.contestant.toAPI(['entries']));
     }));
 
@@ -84,7 +84,7 @@ module.exports = function(app) {
       req.contestant.destroy();
 
       // Respond with no content
-      req.app.locals.logger.verbose(`Removed contestant with identifier ${JSON.stringify(contestant.id)}`);
+      req.app.locals.logger.verbose(`Removed contestant with identifier ${JSON.stringify(req.contestant.id)}`);
       return res.status(204).send();
     }));
 

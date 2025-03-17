@@ -39,7 +39,7 @@ module.exports = function(app) {
       });
 
       // Respond with the contestant
-      req.app.locals.logger.verbose(`Created contestant with identifier ${JSON.stringify(req.contestant.id)}`);
+      req.app.locals.logger.verbose(`Created contestant with identifier ${JSON.stringify(contestant.id)}`);
       return res.status(201).json(await contestant.toAPI());
     }));
 
